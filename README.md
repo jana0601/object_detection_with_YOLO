@@ -1,6 +1,8 @@
 # 🔍 YOLO Object Detection Application
 
 A modern web application for real-time object detection using YOLOv8, built with Flask backend and React frontend.
+## Interface
+![YOLO Object Detection Interface](https://github.com/jana0601/object_detection_with_YOLO/blob/main/interface2.jpg?raw=true)
 
 ## ✨ Features
 

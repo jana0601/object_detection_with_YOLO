@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 Real-Time YOLO Object Detection</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .video-section {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .video-container {
+            position: relative;
+            background: #000;
+            border-radius: 15px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        #videoElement {
+            width: 100%;
+            height: 400px;
+            object-fit: cover;
+        }
+
+        .video-overlay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 25px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #27ae60 0%, #20c997 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(39, 174, 96, 0.4);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(231, 76, 60, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .confidence-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px 15px;
+            border-radius: 15px;
+        }
+
+        .confidence-control label {
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .confidence-control input[type="range"] {
+            width: 150px;
+        }
+
+        .confidence-value {
+            font-weight: 600;
+            min-width: 40px;
+            text-align: center;
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .info-panel {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .info-panel h3 {
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 15px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        .detections-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .detection-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .detection-name {
+            font-weight: 600;
+            text-transform: capitalize;
+        }
+
+        .detection-confidence {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-active {
+            background: #27ae60;
+            box-shadow: 0 0 10px rgba(39, 174, 96, 0.5);
+        }
+
+        .status-inactive {
+            background: #e74c3c;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 1.1rem;
+        }
+
+        .error {
+            background: rgba(231, 76, 60, 0.2);
+            border: 1px solid #e74c3c;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 Real-Time YOLO Object Detection</h1>
+            <p>Web-based object detection using YOLOv8 and WebRTC</p>
+        </div>
+
+        <div class="main-content">
+            <div class="video-section">
+                <div class="video-container">
+                    <video id="videoElement" autoplay muted style="display: none;"></video>
+                    <canvas id="canvasElement" style="width: 100%; height: 400px; object-fit: cover;"></canvas>
+                    <div class="video-overlay">
+                        <div>Status: <span class="status-indicator status-inactive" id="statusIndicator"></span><span id="statusText">Inactive</span></div>
+                        <div>Camera: <span id="cameraStatus">Not Started</span></div>
+                    </div>
+                </div>
+
+                <div class="controls">
+                    <button class="btn btn-primary" id="startCameraBtn">🎥 Start Camera</button>
+                    <button class="btn btn-secondary" id="detectBtn" disabled>🔍 Start Detection</button>
+                    <button class="btn btn-danger" id="stopBtn" disabled>⏹️ Stop</button>
+                    
+                    <div class="confidence-control">
+                        <label for="confidenceSlider">Confidence:</label>
+                        <input type="range" id="confidenceSlider" min="0.1" max="0.9" step="0.1" value="0.5">
+                        <span class="confidence-value" id="confidenceValue">0.5</span>
+                    </div>
+                </div>
+
+                <div id="errorContainer"></div>
+            </div>
+
+            <div class="sidebar">
+                <div class="info-panel">
+                    <h3>📊 Performance</h3>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-value" id="detectionCount">0</div>
+                            <div class="stat-label">Detections</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="fpsCounter">0</div>
+                            <div class="stat-label">FPS</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="info-panel">
+                    <h3>🎯 Detected Objects</h3>
+                    <div class="detections-list" id="detectionsList">
+                        <div class="loading">Start detection to see objects</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let video = document.getElementById('videoElement');
+        let canvas = document.getElementById('canvasElement');
+        let ctx = canvas.getContext('2d');
+        let stream = null;
+        let detectionActive = false;
+        let fpsCounter = 0;
+        let fpsStartTime = Date.now();
+        let frameSkipCounter = 0;
+        let frameSkipInterval = 2; // Process every 3rd frame
+        let lastAnnotatedFrame = null;
+
+        // Socket.IO connection
+        const socket = io();
+
+        // DOM elements
+        const startCameraBtn = document.getElementById('startCameraBtn');
+        const detectBtn = document.getElementById('detectBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const confidenceSlider = document.getElementById('confidenceSlider');
+        const confidenceValue = document.getElementById('confidenceValue');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+        const cameraStatus = document.getElementById('cameraStatus');
+        const detectionCount = document.getElementById('detectionCount');
+        const fpsCounterEl = document.getElementById('fpsCounter');
+        const detectionsList = document.getElementById('detectionsList');
+        const errorContainer = document.getElementById('errorContainer');
+
+        // Event listeners
+        startCameraBtn.addEventListener('click', startCamera);
+        detectBtn.addEventListener('click', toggleDetection);
+        stopBtn.addEventListener('click', stopCamera);
+        confidenceSlider.addEventListener('input', updateConfidence);
+
+        // Socket.IO event handlers
+        socket.on('connect', function() {
+            console.log('Connected to server');
+        });
+
+        socket.on('detection_update', function(data) {
+            updateDetections(data.detections);
+            detectionCount.textContent = data.count;
+            
+            // Update canvas with annotated frame
+            if (data.annotated_frame) {
+                lastAnnotatedFrame = data.annotated_frame;
+                displayAnnotatedFrame(data.annotated_frame);
+            }
+        });
+
+        socket.on('detection_status', function(data) {
+            detectionActive = data.active;
+            updateStatus();
+        });
+
+        socket.on('confidence_update', function(data) {
+            confidenceSlider.value = data.confidence;
+            confidenceValue.textContent = data.confidence;
+        });
+
+        socket.on('status', function(data) {
+            detectionActive = data.detection_active;
+            confidenceSlider.value = data.confidence_threshold;
+            confidenceValue.textContent = data.confidence_threshold;
+            updateStatus();
+        });
+
+        // Camera functions
+        async function startCamera() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        width: { ideal: 640 },
+                        height: { ideal: 480 }
+                    } 
+                });
+                
+                video.srcObject = stream;
+                cameraStatus.textContent = 'Active';
+                
+                startCameraBtn.disabled = true;
+                detectBtn.disabled = false;
+                stopBtn.disabled = false;
+                
+                hideError();
+                console.log('Camera started successfully');
+                
+            } catch (error) {
+                showError('Failed to start camera: ' + error.message);
+                console.error('Camera error:', error);
+            }
+        }
+
+        function stopCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            
+            video.srcObject = null;
+            cameraStatus.textContent = 'Stopped';
+            detectionActive = false;
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            startCameraBtn.disabled = false;
+            detectBtn.disabled = true;
+            stopBtn.disabled = true;
+            
+            updateStatus();
+            clearDetections();
+            console.log('Camera stopped');
+        }
+
+        function toggleDetection() {
+            detectionActive = !detectionActive;
+            
+            fetch('/api/toggle_detection', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ active: detectionActive })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateStatus();
+                }
+            })
+            .catch(error => {
+                console.error('Error toggling detection:', error);
+                showError('Failed to toggle detection');
+            });
+        }
+
+        function updateConfidence() {
+            const confidence = parseFloat(confidenceSlider.value);
+            confidenceValue.textContent = confidence;
+            
+            fetch('/api/set_confidence', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ confidence: confidence })
+            })
+            .catch(error => {
+                console.error('Error updating confidence:', error);
+            });
+        }
+
+        function updateStatus() {
+            if (detectionActive) {
+                statusIndicator.className = 'status-indicator status-active';
+                statusText.textContent = 'Detecting';
+                detectBtn.textContent = '⏸️ Stop Detection';
+                detectBtn.className = 'btn btn-danger';
+            } else {
+                statusIndicator.className = 'status-indicator status-inactive';
+                statusText.textContent = 'Inactive';
+                detectBtn.textContent = '🔍 Start Detection';
+                detectBtn.className = 'btn btn-secondary';
+            }
+        }
+
+        function updateDetections(detections) {
+            if (detections.length === 0) {
+                detectionsList.innerHTML = '<div class="loading">No objects detected</div>';
+                return;
+            }
+
+            detectionsList.innerHTML = detections.map(detection => `
+                <div class="detection-item">
+                    <span class="detection-name">${detection.class_name}</span>
+                    <span class="detection-confidence">${(detection.confidence * 100).toFixed(1)}%</span>
+                </div>
+            `).join('');
+        }
+
+        function clearDetections() {
+            detectionsList.innerHTML = '<div class="loading">Start detection to see objects</div>';
+            detectionCount.textContent = '0';
+        }
+
+        function displayAnnotatedFrame(frameData) {
+            const img = new Image();
+            img.onload = function() {
+                // Set canvas size to match image
+                canvas.width = img.width;
+                canvas.height = img.height;
+                
+                // Draw the annotated frame
+                ctx.drawImage(img, 0, 0);
+            };
+            img.src = frameData;
+        }
+
+        function showError(message) {
+            errorContainer.innerHTML = `
+                <div class="error">
+                    ❌ ${message}
+                </div>
+            `;
+        }
+
+        function hideError() {
+            errorContainer.innerHTML = '';
+        }
+
+        // Frame processing for detection
+        function processFrame() {
+            if (!detectionActive || !stream) return;
+
+            frameSkipCounter++;
+            if (frameSkipCounter <= frameSkipInterval) return;
+            frameSkipCounter = 0;
+
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCanvas.width = video.videoWidth;
+            tempCanvas.height = video.videoHeight;
+            tempCtx.drawImage(video, 0, 0);
+            
+            const frameData = tempCanvas.toDataURL('image/jpeg', 0.8);
+            
+            fetch('/api/detect', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ frame: frameData })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.annotated_frame) {
+                    displayAnnotatedFrame(data.annotated_frame);
+                }
+            })
+            .catch(error => {
+                console.error('Detection error:', error);
+            });
+        }
+
+        // FPS counter
+        function updateFPS() {
+            fpsCounter++;
+            if (fpsCounter % 30 === 0) {
+                const fps = 30000 / (Date.now() - fpsStartTime);
+                fpsCounterEl.textContent = fps.toFixed(1);
+                fpsStartTime = Date.now();
+            }
+        }
+
+        // Main loop
+        function mainLoop() {
+            processFrame();
+            updateFPS();
+            
+            // Display original video if no detection is active
+            if (!detectionActive && stream) {
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            }
+            
+            requestAnimationFrame(mainLoop);
+        }
+
+        // Start main loop
+        mainLoop();
+
+        // Initialize
+        updateStatus();
+    </script>
+</body>
+</html>
